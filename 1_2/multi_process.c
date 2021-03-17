@@ -9,7 +9,7 @@
 #include <fcntl.h>
 #include <string.h>
 
-#define BUFFER_SIZE 64
+#define BUFFER_SIZE 32
 
 int shmid_1;
 int shmid_2;
@@ -49,105 +49,6 @@ void V(int semid, int index){
     return;
 }
 
-void get(){
-    //printf("get_in");
-    // GtkWidget *window;
-    // gtk_init(&argc, &argv);
-    // window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
-    // gtk_window_set_title(GTK_WINDOW(window),"GET");
-    // gtk_window_set_default_size(GTK_WINDOW(window),500,500);
-    // gtk_window_set_position(GTK_WINDOW(window),GTK_WIN_POS_NONE);
-    // gtk_widget_show_all(window);
-    //gtk_container_add(GTK_WINDOW(window), )
-    int fd;
-	int lenth;
-	int times = 1;
-	struct share_buf *in = share_buf_1;
-	fd = open("./input.txt", O_RDONLY);
-	if(fd == -1){
-		printf("file open failed(W)\n");
-		return;
-	}
-	while(1){
-		P(semid, 0);
-		lenth = read(fd, in->buffer, BUFFER_SIZE);
-		if(lenth != BUFFER_SIZE){
-			printf("the last time read %d bytes from input file to buffer 1\n", lenth);
-			in->lenth = lenth;
-			V(semid, 1);
-			return;
-		}
-		printf("the %d th read %d bytes from input file to buffer 1\n", times++, lenth);
-        in->lenth = lenth;
-		V(semid, 1);
-	}
-    // g_signal_connect(G_OBJECT(window), "destroy", G_CALLBACK(gtk_main_quit), NULL);
-    // gtk_main();
-}
-
-void trans(){
-    // GtkWidget *window;
-    // gtk_init(&argc, &argv);
-    // window = gtk_window_new(GTK_WINDOW_POPUP);
-    // gtk_window_set_title(GTK_WINDOW(window),"GET");
-    // gtk_window_set_default_size(GTK_WINDOW(window),500,500);
-    // gtk_window_set_position(GTK_WINDOW(window),GTK_WIN_POS_NONE);
-    // gtk_widget_show_all(window);
-    //gtk_container_add(GTK_WINDOW(window), )
-    int times = 1;
-    struct share_buf *in = share_buf_1;
-    struct share_buf *out = share_buf_2;
-    while(1){
-        P(semid, 1);
-        P(semid, 2);
-        if(in->lenth != BUFFER_SIZE){
-            printf("the last time trans %d bytes from buffer 1 to buffer 2\n", in->lenth);
-            strncpy(out->buffer, in->buffer, in->lenth);
-            out->lenth = in->lenth;
-            V(semid, 0);
-            V(semid, 3);
-            return;
-        }
-        strncpy(out->buffer, in->buffer, in->lenth);
-        printf("the %d th trans %d bytes from buffer 1 to buffer 2\n", times++,  in->lenth);
-        out->lenth = in->lenth;
-        V(semid, 0);
-        V(semid, 3);
-    }
-    // gtk_main();
-}
-
-void put(){
-    // GtkWidget *window;
-    // gtk_init(&argc, &argv);
-    // window = gtk_window_new(GTK_WINDOW_POPUP);
-    // gtk_window_set_title(GTK_WINDOW(window),"GET");
-    // gtk_window_set_default_size(GTK_WINDOW(window),500,500);
-    // gtk_window_set_position(GTK_WINDOW(window),GTK_WIN_POS_NONE);
-    // gtk_widget_show_all(window);
-    //gtk_container_add(GTK_WINDOW(window), )
-    int fd;
-	int times = 1;
-	struct share_buf *out = share_buf_2;
-	fd = open("./output.txt", O_WRONLY|O_CREAT|O_TRUNC);
-	if(fd == -1){
-		printf("file open failed(R)\n");
-		return;
-	}
-	while(1){
-		P(semid, 3);
-        if(out->lenth != BUFFER_SIZE){
-			printf("the last time write %d bytes from buffer 2 to output file\n", out->lenth);
-			write(fd, out->buffer, out->lenth);
-            V(semid, 2);
-			return;
-		}
-        write(fd, out->buffer, BUFFER_SIZE);
-		printf("the %d th write %d bytes from buffer 2 to output file\n", times++, out->lenth);
-		V(semid, 2);
-	}
-    // gtk_main();
-}
 int main(int argc, char *argv[])                //标准c语言主函数的声明
 {
     void *shmaddr_1 = NULL;
@@ -190,8 +91,39 @@ int main(int argc, char *argv[])                //标准c语言主函数的声�
         gtk_window_set_title(GTK_WINDOW(window),"GET");
         gtk_window_set_default_size(GTK_WINDOW(window),500,500);
         gtk_window_set_position(GTK_WINDOW(window),GTK_WIN_POS_NONE);
+        GtkWidget *vbox = gtk_vbox_new(TRUE, 10);
+        gtk_container_add(GTK_CONTAINER(window), vbox);
+        GtkWidget *label_1 = gtk_label_new("由文件input.txt写入第一个缓冲空间");
+        gtk_container_add(GTK_CONTAINER(vbox), label_1);
+        GtkWidget *label_2 = gtk_label_new("label_two");
+        gtk_container_add(GTK_CONTAINER(vbox), label_2);
+
+
+        int fd;
+        int lenth;
+    	int times = 1;
+        struct share_buf *in = share_buf_1;
+	    fd = open("./input.txt", O_RDONLY);
+	    if(fd == -1){
+        	printf("file open failed(W)\n");
+	        return 0;
+        }
+	    while(1){
+	        P(semid, 0);
+	        lenth = read(fd, in->buffer, BUFFER_SIZE);
+	        if(lenth != BUFFER_SIZE){
+		        printf("the last time read %d bytes from input file to buffer 1\n", lenth);
+		        in->lenth = lenth;
+                gtk_label_set_line_wrap(GTK_LABEL(label_2), TRUE);
+                gtk_label_set_text(GTK_LABEL(label_2), in->buffer);
+		        V(semid, 1);
+		        break;
+	        }
+	        printf("the %d th read %d bytes from input file to buffer 1\n", times++, lenth);
+            in->lenth = lenth;
+	        V(semid, 1);
+        }
         gtk_widget_show_all(window);
-        get();
         g_signal_connect(G_OBJECT(window), "destroy", G_CALLBACK(gtk_main_quit), NULL);
         gtk_main();
     }
@@ -209,8 +141,37 @@ int main(int argc, char *argv[])                //标准c语言主函数的声�
             gtk_window_set_title(GTK_WINDOW(window),"TRANS");
             gtk_window_set_default_size(GTK_WINDOW(window),500,500);
             gtk_window_set_position(GTK_WINDOW(window),GTK_WIN_POS_NONE);
+            GtkWidget *vbox = gtk_vbox_new(TRUE, 10);
+            gtk_container_add(GTK_CONTAINER(window), vbox);
+            GtkWidget *label_1 = gtk_label_new("由第一个缓冲空间写入第二个缓冲空间");
+            gtk_container_add(GTK_CONTAINER(vbox), label_1);
+            GtkWidget *label_2 = gtk_label_new("label_two");
+            gtk_container_add(GTK_CONTAINER(vbox), label_2);
+
+
+            int times = 1;
+            struct share_buf *in = share_buf_1;
+            struct share_buf *out = share_buf_2;
+            while(1){
+                P(semid, 1);
+                P(semid, 2);
+                if(in->lenth != BUFFER_SIZE){
+                    printf("the last time trans %d bytes from buffer 1 to buffer 2\n", in->lenth);
+                    strncpy(out->buffer, in->buffer, in->lenth);
+                    out->lenth = in->lenth;
+                    gtk_label_set_line_wrap(GTK_LABEL(label_2), TRUE);
+                    gtk_label_set_text(GTK_LABEL(label_2), in->buffer);
+                    V(semid, 0);
+                    V(semid, 3);
+                    break;
+                }
+                strncpy(out->buffer, in->buffer, in->lenth);
+                printf("the %d th trans %d bytes from buffer 1 to buffer 2\n", times++,  in->lenth);
+                out->lenth = in->lenth;
+                V(semid, 0);
+                V(semid, 3);
+            }
             gtk_widget_show_all(window);
-            trans();
             g_signal_connect(G_OBJECT(window), "destroy", G_CALLBACK(gtk_main_quit), NULL);
             gtk_main();
         }
@@ -227,11 +188,42 @@ int main(int argc, char *argv[])                //标准c语言主函数的声�
             gtk_window_set_title(GTK_WINDOW(window),"PUT");
             gtk_window_set_default_size(GTK_WINDOW(window),500,500);
             gtk_window_set_position(GTK_WINDOW(window),GTK_WIN_POS_NONE);
+            GtkWidget *vbox = gtk_vbox_new(TRUE, 10);
+            gtk_container_add(GTK_CONTAINER(window), vbox);
+            GtkWidget *label_1 = gtk_label_new("由第二个缓冲空间写入文件output.txt");
+            gtk_container_add(GTK_CONTAINER(vbox), label_1);
+            GtkWidget *label_2 = gtk_label_new("label_two");
+            gtk_container_add(GTK_CONTAINER(vbox), label_2);
+
+            
+
+            int fd;
+	        int times = 1;
+        	struct share_buf *out = share_buf_2;
+        	fd = open("./output.txt", O_WRONLY|O_CREAT|O_TRUNC);
+            if(fd == -1){
+        		printf("file open failed(R)\n");
+        		return 0;
+        	}
+	        while(1){
+        		P(semid, 3);
+                // sleep(1);
+                if(out->lenth != BUFFER_SIZE){
+        			printf("the last time write %d bytes from buffer 2 to output file\n", out->lenth);
+                    gtk_label_set_line_wrap(GTK_LABEL(label_2), TRUE);
+                    gtk_label_set_text(GTK_LABEL(label_2), out->buffer);
+        			write(fd, out->buffer, out->lenth);
+                    V(semid, 2);
+        			break;
+        		}
+                write(fd, out->buffer, BUFFER_SIZE);
+        		printf("the %d th write %d bytes from buffer 2 to output file\n", times++, out->lenth);
+        		V(semid, 2);
+        	}
             gtk_widget_show_all(window);
-            put();
             g_signal_connect(G_OBJECT(window), "destroy", G_CALLBACK(gtk_main_quit), NULL);
             gtk_main();
-            }
+            }   
             else{
                 waitpid(p1, NULL, 0);
                 waitpid(p2, NULL, 0);
